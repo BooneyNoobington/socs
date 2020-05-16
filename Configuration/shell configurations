@@ -1,0 +1,3 @@
+## Bold and Normal Text ##
+bold=`tput bold`
+normal=`tput sgr0`

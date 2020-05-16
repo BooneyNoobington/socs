@@ -1,0 +1,110 @@
+####################################
+### Basic functions for the bash ###
+####################################
+#
+#
+#
+####################################
+### A adaptation of "echo" #########
+####################################
+socs_echo() {
+  echo "[$1 $( date +"%T" )] $2"
+  # Take the first argument, add a timestamp and then echo the actual in-
+  # formation via the secons argument.
+}
+#
+######################################
+### A function for handling errors ###
+######################################
+usage() {
+	echo "Usage: $1.sh $2" >&2
+  # Display a massage with the name of the executes script ("$1") and a list
+  # of possible options.
+	[[ $# -eq 1 ]] && exit $1 || exit $EXIT_FAILURE
+}
+#
+######################################
+### Thorough display of ##############
+### date and time ####################
+######################################
+full_date() {
+  # Get local.
+  language=$(locale | grep LANG | cut -d= -f2 | cut -d_ -f1)
+  case $language in  # Look up the text for the current localisation.
+    ge)  # German language.
+      # Example for a thorough german date: Freitag den 13. November 2015...
+      date +"%A den %d. %B %Y, %H:%M Uhr" ;;
+    *)
+      date +"%s"
+  esac
+}
+#
+sorting_date() {
+  date +"%Y.%m.%d_%H.%M_Uhr"  # No ":" is used in the filename to increase com-
+  # patibility (especially for Mac OS X).
+}
+#
+######################################
+### Check for Background #############
+### execution ########################
+######################################
+background_exec() {
+  if [[ $background == "yes" ]]; then
+    # Check if screen is even installed.
+    . "$BASEDIR/Configuration/binpaths.sh" screen
+    # Reopen this very script but in background.
+    "$SCREEN_BIN" -a -S "$SCRIPTNAME_`sorting_date`" "$BASEDIR/$SCRIPTNAME" $1
+    # Quit this instance of the script.
+    exit 0
+  fi
+}
+#
+######################################
+### Function for checking and ########
+### installation of software #########
+######################################
+check_and_install(){
+  # Maybe there is a self-compiled variant of the required binary. These are to be preferred.
+  #TODO: Maybe make this configurable.
+  source "$BASEDIR/Configuration/self compiled.conf"  # Source config-file.
+  # How will the global variable for the required binary be called?
+  uppercase_biary=`echo "$1" | awk '{print toupper($0)}'` # Create an upper-
+                                            # case version of the binary name.
+  bin_variable_name="$uppercase_biary""_BIN"
+  # If this binary is not in "self compiled.conf" than $bin_variable_name will be null.
+  # Otherwise it will have already a path assigned.
+  # eval `echo "$"$bin_variable_name`
+  if [[ "${!bin_variable_name}" != '' ]]; then  # Check if a local build was made for the given programm.
+    # Which path will the variable for the binary contain.
+    # Inform the user.
+    socs_echo "check_and_install" "Local build found in ${bold}"${!bin_variable_name}"${normal}"
+  else  # No local build exists ($bin_variable_name was null).
+  # If there is no local build, the one installed by the package manager shall
+  # be used.
+  socs_echo "check_and_install" "No local build of $1 was found ..."
+    # Check if such a binary exists.
+    which $1 >/dev/null 2>&1 # "which" identifies where a given binary is stored.
+    # Throw the output in /dev/null so it won't be displayed.
+    if [[ $? -eq 0 ]]; then  # When "which" didn't end with an error…
+    # ($? gives the most recent error code.)
+      bin_variable_path="`which $1`"  # … set the value for the installed one.
+      socs_echo "check_and_install" "$1 was found at ${bold}$bin_variable_path${normal}"
+    else  # $? not beeing zero means "which" wasn't successful. Hence the binary
+          # is most likely not installed.
+      socs_echo "check_and_install" "$1 doesn't seem to be installed. Attempting installation now ..."
+      "$BASEDIR/install" $1  # Use the install script to attempt an installation.
+      if [[ $? -eq 0 ]]; then  # The installation didn't end with an error…
+        bin_variable_path="`which $1`"  # … set the value for the installed one.
+        socs_echo "check_and_install" "$1 was installed to ${bold}$bin_variable_path${normal}"
+      else  # Installation failed.
+        socs_echo "check_and_install" "Installation failed. Aborting ..."
+        exit 1  # End script with errorcode 1.
+      fi
+    fi
+  fi
+  # Set the variable for the path of the required binary.
+  eval "$bin_variable_name=\"$bin_variable_path\""
+  # And now export the binary path that has been identified throughout this
+  # function.
+  export eval $bin_variable_name
+}
